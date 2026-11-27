@@ -20,6 +20,7 @@ spec:
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8000
+            - containerPort: 50051   # gRPC ContextService (Lab 3B)
           envFrom:
             - configMapRef: {name: dcc-config}
             - secretRef: {name: dcc-secret}
@@ -44,8 +45,12 @@ spec:
   selector:
     app: rag-context-service
   ports:
-    - port: 8000
+    - name: http
+      port: 8000
       targetPort: 8000
+    - name: grpc
+      port: 50051
+      targetPort: 50051
 ---
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler

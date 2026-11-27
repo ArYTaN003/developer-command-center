@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     rabbitmq_password: str = "guest"
     rabbitmq_events_exchange: str = "github.events"
 
+    # --- gRPC (Lab 3B: ContextService, served alongside REST) ---
+    grpc_port: int = 50051
+
     # --- Embeddings ---
     embedding_mode: str = "hash"   # "hash" (local, zero-download) | "st"
     embedding_dim: int = 256

@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+// Lab 3B — synchronous gRPC between services. Build copy compiled at startup
+// via grpc's dynamic loader. Keep in sync with /proto/context.proto (canonical).
+package dcc;
+
+service ContextService {
+  rpc GetContext (ContextRequest) returns (ContextReply);
+}
+
+message ContextRequest {
+  string repo = 1;
+  int32 days = 2;
+}
+
+message ContextReply {
+  string repo = 1;
+  string summary = 2;
+  int32 documents = 3;
+}

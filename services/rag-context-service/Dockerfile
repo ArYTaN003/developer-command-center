@@ -14,8 +14,9 @@ RUN groupadd -r appgroup && useradd -r -g appgroup appuser
 WORKDIR /app
 COPY --from=builder /install /usr/local
 COPY --chown=appuser:appgroup ./app ./app
+COPY --chown=appuser:appgroup ./context.proto ./context.proto
 USER appuser
-EXPOSE 8000
+EXPOSE 8000 50051
 HEALTHCHECK --interval=15s --timeout=5s --start-period=25s --retries=5 \
   CMD curl -fsS http://localhost:8000/health || exit 1
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

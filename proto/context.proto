@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+// Lab 3B — synchronous gRPC communication between services.
+// ai-review-service (client) calls rag-context-service (server) GetContext,
+// alongside the existing REST /context endpoint (both sync styles demonstrated).
+//
+// Canonical copy. The build copies in each service
+// (services/<svc>/context.proto) must match this file; they are compiled at
+// startup via grpc's dynamic loader (no separate codegen step).
+package dcc;
+
+service ContextService {
+  rpc GetContext (ContextRequest) returns (ContextReply);
+}
+
+message ContextRequest {
+  string repo = 1;
+  int32 days = 2;
+}
+
+message ContextReply {
+  string repo = 1;
+  string summary = 2;
+  int32 documents = 3;
+}

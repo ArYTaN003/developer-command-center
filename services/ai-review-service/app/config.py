@@ -20,6 +20,8 @@ class Settings(BaseSettings):
 
     # --- RAG context service (sync dependency) ---
     rag_context_url: str = "http://rag-context-service:8000"
+    # gRPC target for the ContextService (Lab 3B); same DNS in Compose and K8s.
+    rag_grpc_target: str = "rag-context-service:50051"
 
     # --- PostgreSQL (reviews-db) ---
     db_host: str = "reviews-db"

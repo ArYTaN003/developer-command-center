@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from .config import settings
 from .consumer import run_consumer
 from .context import get_context, redis_ping, session_block
+from .grpc_server import serve_grpc
 from .indexer import count, ensure_collection, index_document
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
@@ -30,9 +31,11 @@ async def _ensure_collection_with_retry(attempts: int = 30, delay: float = 2.0) 
 async def lifespan(app: FastAPI):
     await _ensure_collection_with_retry()
     consumer_task = asyncio.create_task(run_consumer())
+    grpc_task = asyncio.create_task(serve_grpc(settings.grpc_port))
     log.info("rag-context-service ready")
     yield
     consumer_task.cancel()
+    grpc_task.cancel()
 
 
 app = FastAPI(title="rag-context-service", version="1.0.0", lifespan=lifespan)

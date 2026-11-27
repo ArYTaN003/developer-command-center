@@ -5,7 +5,7 @@ from fnmatch import fnmatch
 from sqlalchemy import select
 
 from .models import PromptTemplate, Review, SessionLocal
-from .rag_client import get_context
+from .grpc_rag_client import get_context  # Lab 3B: fetch project context over gRPC (was rag_client REST)
 from .reviewer import generate_review
 
 log = logging.getLogger("ai-review-service.service")
