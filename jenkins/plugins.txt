@@ -1,0 +1,13 @@
+# Jenkins plugins required by the Developer Command Center pipeline.
+configuration-as-code
+credentials
+credentials-binding
+plain-credentials
+workflow-aggregator
+docker-workflow
+git
+github
+github-branch-source
+kubernetes-cli
+job-dsl
+blueocean

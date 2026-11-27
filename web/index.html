@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Developer Command Center</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --bg:#070b11; --bg-grid:rgba(53,208,186,.035);
+    --panel:#0e1521; --panel-2:#0a1018; --panel-hi:#121b2b;
+    --border:#1c2636; --border-hi:#2a3a52;
+    --text:#cdd8e8; --muted:#64748b; --dim:#43506640;
+    --cyan:#2dd4bf; --cyan-dim:#145f57;
+    --amber:#f6b74a; --violet:#8b8bf0;
+    --ok:#36d399; --warn:#f6b74a; --err:#ff5d5d; --idle:#3b465c; --info:#5aa9e6;
+    --mono:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+    --sans:'IBM Plex Sans',system-ui,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    background:var(--bg);
+    background-image:
+      linear-gradient(var(--bg-grid) 1px,transparent 1px),
+      linear-gradient(90deg,var(--bg-grid) 1px,transparent 1px),
+      radial-gradient(1200px 600px at 80% -10%,rgba(45,212,191,.06),transparent 60%);
+    background-size:34px 34px,34px 34px,100% 100%;
+    color:var(--text); font-family:var(--sans); font-size:14px; line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  a{color:var(--cyan)}
+  header{
+    display:flex; align-items:center; justify-content:space-between; gap:20px;
+    padding:18px 26px; border-bottom:1px solid var(--border);
+    background:linear-gradient(180deg,rgba(14,21,33,.9),rgba(10,16,24,.6));
+    backdrop-filter:blur(6px); position:sticky; top:0; z-index:20;
+  }
+  .brand{display:flex; align-items:center; gap:14px; min-width:0}
+  .beacon{width:11px;height:11px;border-radius:50%;background:var(--cyan);
+    box-shadow:0 0 0 0 rgba(45,212,191,.6); animation:pulse 2.4s infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(45,212,191,.5)}70%{box-shadow:0 0 0 10px rgba(45,212,191,0)}100%{box-shadow:0 0 0 0 rgba(45,212,191,0)}}
+  .brand h1{font-family:var(--mono); font-weight:700; font-size:16px; letter-spacing:.14em; margin:0; white-space:nowrap}
+  .brand .sub{font-family:var(--mono); color:var(--muted); font-size:11px; letter-spacing:.1em}
+  .status-strip{display:flex; align-items:center; gap:18px; flex-wrap:wrap}
+  .svc{display:flex; align-items:center; gap:7px; font-family:var(--mono); font-size:11px; letter-spacing:.08em; color:var(--muted); text-transform:uppercase}
+  .dot{width:9px;height:9px;border-radius:50%;background:var(--idle); transition:background .3s, box-shadow .3s}
+  .dot.ok{background:var(--ok); box-shadow:0 0 8px var(--ok)}
+  .dot.err{background:var(--err); box-shadow:0 0 8px var(--err)}
+  .dot.wait{background:var(--amber); box-shadow:0 0 8px var(--amber); animation:blink 1s infinite}
+  @keyframes blink{50%{opacity:.3}}
+  .refresh{font-family:var(--mono);font-size:11px;letter-spacing:.08em;color:var(--cyan);
+    background:transparent;border:1px solid var(--cyan-dim);border-radius:6px;padding:6px 11px;cursor:pointer;text-transform:uppercase;transition:.2s}
+  .refresh:hover{background:rgba(45,212,191,.1);border-color:var(--cyan)}
+  .wrap{display:grid; grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr); gap:22px; padding:24px 26px; max-width:1560px; margin:0 auto; align-items:start}
+  @media(max-width:1040px){.wrap{grid-template-columns:1fr}}
+  .modules{display:flex; flex-direction:column; gap:16px}
+  /* help */
+  details.help{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:0 16px}
+  details.help>summary{cursor:pointer;list-style:none;padding:14px 0;font-family:var(--mono);font-size:12px;letter-spacing:.08em;color:var(--cyan)}
+  details.help>summary::-webkit-details-marker{display:none}
+  details.help ol{margin:0 0 14px;padding-left:20px;color:var(--text)}
+  details.help li{margin:7px 0}
+  details.help b{color:#e6edf7}
+  details.help code{font-family:var(--mono);font-size:12px;background:var(--panel-2);padding:1px 6px;border-radius:4px;color:var(--cyan)}
+  /* cards */
+  .card{background:linear-gradient(180deg,var(--panel),var(--panel-2)); border:1px solid var(--border); border-radius:12px; padding:18px 18px 16px; position:relative; overflow:hidden}
+  .card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:linear-gradient(var(--accent,var(--cyan)),transparent)}
+  .card .idx{font-family:var(--mono);font-size:10px;letter-spacing:.2em;color:var(--muted)}
+  .card h2{font-family:var(--mono);font-size:14px;letter-spacing:.06em;margin:4px 0 2px;font-weight:600;color:#e6edf7}
+  .card p.desc{margin:0 0 14px;color:var(--muted);font-size:12.5px}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .field{display:flex;flex-direction:column;gap:4px;margin-bottom:12px}
+  .field label{font-family:var(--mono);font-size:10px;letter-spacing:.12em;color:var(--muted);text-transform:uppercase}
+  input[type=text],input[type=number]{font-family:var(--mono);font-size:13px;color:var(--text);background:var(--panel-2);border:1px solid var(--border-hi);border-radius:7px;padding:9px 11px;min-width:0;width:100%}
+  input:focus{outline:none;border-color:var(--cyan);box-shadow:0 0 0 2px rgba(45,212,191,.12)}
+  .inline{display:flex;gap:10px;flex-wrap:wrap}
+  .inline .field{flex:1;min-width:120px}
+  button.act{font-family:var(--mono);font-size:12px;letter-spacing:.04em;cursor:pointer;background:var(--panel-hi);color:var(--text);border:1px solid var(--border-hi);border-radius:7px;padding:9px 13px;transition:.16s}
+  button.act:hover{border-color:var(--accent,var(--cyan));color:#fff;box-shadow:0 0 0 1px var(--accent,var(--cyan)) inset}
+  button.act:active{transform:translateY(1px)}
+  button.act .m{color:var(--muted);font-size:10px;margin-right:6px}
+  button.act.primary{background:linear-gradient(180deg,rgba(45,212,191,.16),rgba(45,212,191,.06));border-color:var(--cyan-dim);color:#d6fff8}
+  button.act.warnbtn:hover{border-color:var(--amber);box-shadow:0 0 0 1px var(--amber) inset}
+  /* console */
+  .console{background:var(--panel-2);border:1px solid var(--border);border-radius:12px;position:sticky;top:92px;display:flex;flex-direction:column;max-height:calc(100vh - 118px);overflow:hidden}
+  .console-head{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--border);background:var(--panel)}
+  .console-head .t{font-family:var(--mono);font-size:12px;letter-spacing:.14em;color:#e6edf7}
+  .console-head .clr{font-family:var(--mono);font-size:10px;letter-spacing:.1em;color:var(--muted);background:none;border:1px solid var(--border-hi);border-radius:5px;padding:4px 8px;cursor:pointer}
+  .console-head .clr:hover{color:var(--err);border-color:var(--err)}
+  .log{overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:12px}
+  .log:empty::after{content:"// awaiting command — click any action on the left";color:var(--dim);font-family:var(--mono);font-size:12px;padding:18px 4px;display:block}
+  .entry{border:1px solid var(--border);border-radius:9px;overflow:hidden;background:var(--panel)}
+  .entry .bar{display:flex;align-items:center;gap:10px;padding:8px 11px;font-family:var(--mono);font-size:11px;border-bottom:1px solid var(--border)}
+  .entry .verb{color:#05121a;background:var(--cyan);border-radius:4px;padding:1px 6px;font-weight:600}
+  .entry .verb.POST{background:var(--amber)}
+  .entry .path{color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;font-size:10.5px}
+  .entry .code{font-weight:600}.entry .code.ok{color:var(--ok)}.entry .code.err{color:var(--err)}
+  .entry .ms{color:var(--muted)}
+  .entry .rawtoggle{font-family:var(--mono);font-size:10px;color:var(--muted);background:none;border:1px solid var(--border-hi);border-radius:4px;padding:2px 7px;cursor:pointer}
+  .entry .rawtoggle:hover{color:var(--cyan);border-color:var(--cyan-dim)}
+  .rendered{padding:13px 15px}
+  .rawjson{margin:0;padding:12px 14px;background:var(--panel-2);font-family:var(--mono);font-size:11.5px;line-height:1.55;color:#aeb9cc;overflow:auto;max-height:360px;border-top:1px solid var(--border)}
+  /* rendered content */
+  .rc h4{margin:2px 0 8px;font-family:var(--mono);font-size:13px;letter-spacing:.04em;color:#e6edf7}
+  .rc .muted{color:var(--muted);font-size:12px;margin:4px 0}
+  .rc .err{color:var(--err);font-family:var(--mono);font-size:12.5px}
+  .hl{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:8px}
+  .badge{font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;padding:3px 8px;border-radius:20px;border:1px solid}
+  .badge.ok{color:var(--ok);border-color:#1d6b4d;background:rgba(54,211,153,.08)}
+  .badge.warn{color:var(--amber);border-color:#7a5a1e;background:rgba(246,183,74,.08)}
+  .badge.err{color:var(--err);border-color:#7a2626;background:rgba(255,93,93,.08)}
+  .badge.info{color:var(--info);border-color:#2b5a7e;background:rgba(90,169,230,.08)}
+  .badge.muted{color:var(--muted);border-color:var(--border-hi)}
+  .prose{font-size:13.5px;line-height:1.62;color:#cdd8e8}
+  .prose h2,.prose h3,.prose h4{font-family:var(--sans);color:#eaf1fb;margin:14px 0 6px;line-height:1.3}
+  .prose h2{font-size:16px}.prose h3{font-size:14.5px}.prose h4{font-size:13.5px;color:var(--cyan)}
+  .prose p{margin:7px 0}
+  .prose ul,.prose ol{margin:6px 0 6px;padding-left:20px}
+  .prose li{margin:4px 0}
+  .prose strong{color:#ffffff}
+  .prose em{color:#d6e2f2}
+  .prose code{font-family:var(--mono);font-size:12px;background:var(--panel-2);padding:1px 5px;border-radius:4px;color:var(--cyan)}
+  .prose hr{border:none;border-top:1px solid var(--border);margin:12px 0}
+  .block{margin:0;white-space:pre-wrap;font-family:var(--mono);font-size:12px;line-height:1.6;color:#b7c4d6;background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:12px 13px;overflow:auto;max-height:340px}
+  .tbl{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:4px}
+  .tbl th{text-align:left;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:6px 8px;border-bottom:1px solid var(--border-hi)}
+  .tbl td{padding:7px 8px;border-bottom:1px solid var(--border);vertical-align:top}
+  .tbl tr:last-child td{border-bottom:none}
+  .brk{display:flex;align-items:center;gap:9px;margin:6px 0;font-size:13px}
+  .feed{margin:4px 0 0;padding-left:0;list-style:none}
+  .feed li{padding:6px 0;border-bottom:1px solid var(--border);font-size:12.5px}
+  .feed li:last-child{border-bottom:none}
+  .review-card{border:1px solid var(--border);border-radius:8px;padding:11px 13px;margin:9px 0;background:var(--panel-2)}
+  footer{padding:14px 26px 30px;color:var(--muted);font-family:var(--mono);font-size:11px;letter-spacing:.05em;text-align:center}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <span class="beacon"></span>
+    <div>
+      <h1>DEVELOPER&nbsp;COMMAND&nbsp;CENTER</h1>
+      <div class="sub">microservices control console · :8080</div>
+    </div>
+  </div>
+  <div class="status-strip" id="status">
+    <div class="svc"><span class="dot" data-svc="github"></span>github</div>
+    <div class="svc"><span class="dot" data-svc="rag"></span>rag</div>
+    <div class="svc"><span class="dot" data-svc="reviews"></span>reviews</div>
+    <div class="svc"><span class="dot" data-svc="notify"></span>notify</div>
+    <button class="refresh" onclick="pingAll()">↻ health</button>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="modules">
+
+    <details class="help">
+      <summary>▸ HOW TO TEST — step by step</summary>
+      <ol>
+        <li><b>Check health</b> — top-right dots should all be green. Click <code>↻ health</code> to recheck.</li>
+        <li><b>01 Ingest</b> — set your repo, click <b>Run live poll</b> to pull real PRs/commits (or <b>Simulate PR</b> for a demo event). Then <b>List PRs</b> to see them.</li>
+        <li><b>02 Context</b> — click <b>Get project context</b> for an AI summary of recent activity.</li>
+        <li><b>03 Review</b> — set repo + PR number, click <b>Trigger AI review</b>; read the review. <b>Recent reviews</b> lists all.</li>
+        <li><b>04 Notify</b> — click <b>Generate digest</b>, then <b>Latest digest</b> for the morning brief.</li>
+        <li><b>05 Resilience</b> — <b>Force-fail ON</b> → trigger 2 reviews → <b>Breaker state</b> shows OPEN → <b>Force-fail OFF</b> → wait 10s → recovers.</li>
+        <li>Every result shows human-readable; click <code>raw</code> on any result for the JSON.</li>
+      </ol>
+    </details>
+
+    <section class="card" style="--accent:var(--cyan)">
+      <div class="idx">01 / INGEST</div>
+      <h2>GitHub Activity</h2>
+      <p class="desc">Pull PRs, issues & commits from your repo and publish events to the queue.</p>
+      <div class="field"><label>repository (owner/repo)</label><input type="text" id="repo" value="Saptarshi-bits/council_tool" /></div>
+      <div class="row">
+        <button class="act primary" onclick="call('POST','/api/github/poll?repo='+repoQ())"><span class="m">POST</span>Run live poll</button>
+        <button class="act" onclick="call('GET','/api/github/repos')"><span class="m">GET</span>List repos</button>
+        <button class="act" onclick="call('GET','/api/github/repos/'+repo()+'/prs')"><span class="m">GET</span>List PRs</button>
+        <button class="act" onclick="simulatePR()"><span class="m">POST</span>Simulate PR (demo)</button>
+      </div>
+    </section>
+
+    <section class="card" style="--accent:var(--violet)">
+      <div class="idx">02 / CONTEXT</div>
+      <h2>Project Context (RAG)</h2>
+      <p class="desc">AI-synthesized summary of recent activity — restore context for a work session.</p>
+      <div class="row">
+        <button class="act primary" onclick="call('GET','/api/rag/context?repo='+repoQ()+'&refresh=true')"><span class="m">GET</span>Get project context</button>
+        <button class="act" onclick="call('GET','/api/rag/session-start?repo='+repoQ())"><span class="m">GET</span>Session-start block</button>
+      </div>
+    </section>
+
+    <section class="card" style="--accent:var(--amber)">
+      <div class="idx">03 / REVIEW</div>
+      <h2>AI Code Reviews</h2>
+      <p class="desc">Claude-generated review summaries. Reviews auto-fire on PR events; trigger one manually below.</p>
+      <div class="inline">
+        <div class="field"><label>repo</label><input type="text" id="rrepo" value="Saptarshi-bits/council_tool" /></div>
+        <div class="field" style="max-width:120px"><label>PR number</label><input type="number" id="prnum" value="6" /></div>
+      </div>
+      <div class="row">
+        <button class="act primary" onclick="triggerReview()"><span class="m">POST</span>Trigger AI review</button>
+        <button class="act" onclick="call('GET','/api/reviews/reviews/recent')"><span class="m">GET</span>Recent reviews</button>
+      </div>
+    </section>
+
+    <section class="card" style="--accent:var(--cyan)">
+      <div class="idx">04 / NOTIFY</div>
+      <h2>Notifications & Digest</h2>
+      <p class="desc">Daily morning digest (08:00 UTC cron) aggregating activity + reviews.</p>
+      <div class="row">
+        <button class="act primary" onclick="call('POST','/api/notify/digest/trigger')"><span class="m">POST</span>Generate digest</button>
+        <button class="act" onclick="call('GET','/api/notify/digest/latest')"><span class="m">GET</span>Latest digest</button>
+        <button class="act" onclick="call('GET','/api/notify/activity')"><span class="m">GET</span>Recent activity</button>
+      </div>
+    </section>
+
+    <section class="card" style="--accent:var(--err)">
+      <div class="idx">05 / RESILIENCE</div>
+      <h2>Circuit Breaker</h2>
+      <p class="desc">Claude breaker: fail_max=2, reset_timeout=10s. Force failures, watch it OPEN, then recover.</p>
+      <div class="row">
+        <button class="act" onclick="call('GET','/api/reviews/breaker')"><span class="m">GET</span>Breaker state</button>
+        <button class="act warnbtn" onclick="call('POST','/api/reviews/debug/claude-fail?enabled=true')"><span class="m">POST</span>Force-fail ON</button>
+        <button class="act" onclick="call('POST','/api/reviews/debug/claude-fail?enabled=false')"><span class="m">POST</span>Force-fail OFF</button>
+      </div>
+    </section>
+  </div>
+
+  <aside class="console">
+    <div class="console-head">
+      <span class="t">▸ RESPONSE CONSOLE</span>
+      <button class="clr" onclick="document.getElementById('log').innerHTML=''">clear</button>
+    </div>
+    <div class="log" id="log"></div>
+  </aside>
+</div>
+
+<footer>Developer Command Center · each panel calls a live microservice through the NGINX gateway · click <b>raw</b> on any result for JSON</footer>
+
+<script>
+  const repo  = () => document.getElementById('repo').value.trim();
+  const repoQ = () => encodeURIComponent(repo());
+  const log   = document.getElementById('log');
+  const esc   = s => (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+  /* ---------- tiny markdown renderer (for Claude output + digest) ---------- */
+  function mdInline(s){
+    s = esc(s);
+    s = s.replace(/`([^`]+)`/g,'<code>$1</code>');
+    s = s.replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>');
+    s = s.replace(/(^|[^*])\*([^*\n]+)\*/g,'$1<em>$2</em>');
+    return s;
+  }
+  function md(text){
+    const lines = String(text||'').split(/\r?\n/);
+    let html='', list=null;
+    const close=()=>{ if(list){html+='</'+list+'>'; list=null;} };
+    for(const raw of lines){
+      const line=raw.replace(/\s+$/,''); let m;
+      if(/^\s*(---+|___+|\*\*\*+)\s*$/.test(line)){ close(); html+='<hr>'; continue; }
+      if(/^\s*$/.test(line)){ close(); continue; }
+      if((m=line.match(/^\s*(#{1,6})\s+(.*)/))){ close(); const lvl=Math.min(m[1].length+1,4); html+='<h'+lvl+'>'+mdInline(m[2])+'</h'+lvl+'>'; continue; }
+      if((m=line.match(/^\s*[-*]\s+(.*)/))){ if(list!=='ul'){close();list='ul';html+='<ul>';} html+='<li>'+mdInline(m[1])+'</li>'; continue; }
+      if((m=line.match(/^\s*\d+\.\s+(.*)/))){ if(list!=='ol'){close();list='ol';html+='<ol>';} html+='<li>'+mdInline(m[1])+'</li>'; continue; }
+      close(); html+='<p>'+mdInline(line)+'</p>';
+    }
+    close(); return html;
+  }
+
+  const badge=(t,c)=>'<span class="badge '+c+'">'+esc(t)+'</span>';
+
+  function reviewCard(r){
+    if(!r||!r.summary) return '<p class="muted">No review available.</p>';
+    return '<div class="review-card"><div class="hl">'+badge(r.degraded?'degraded':'ai review',r.degraded?'warn':'ok')+
+      '<span class="muted">'+esc(r.pr_id||r.repo||'')+'</span></div><div class="prose">'+md(r.summary)+'</div></div>';
+  }
+  function prTable(prs){
+    if(!prs||!prs.length) return '<p class="muted">No pull requests stored yet. Run a live poll first.</p>';
+    return '<table class="tbl"><thead><tr><th>#</th><th>Title</th><th>State</th><th>Author</th></tr></thead><tbody>'+
+      prs.map(p=>'<tr><td>'+esc(p.number)+'</td><td>'+esc(p.title)+'</td><td>'+badge(p.state,p.state==='open'?'ok':'muted')+'</td><td>'+esc(p.author||'')+'</td></tr>').join('')+'</tbody></table>';
+  }
+  function breaker(name,b){
+    if(!b) return '';
+    const st=(b.state||'').toLowerCase(), cls=st==='closed'?'ok':(st==='open'?'err':'warn');
+    const fails=(b.fails!=null?b.fails:b.fail_counter);
+    return '<div class="brk">'+badge(st||'?',cls)+'<b>'+esc(name)+'</b><span class="muted">fails '+esc(fails)+(b.fail_max?' / '+b.fail_max:'')+(b.reset_timeout?' · reset '+b.reset_timeout+'s':'')+'</span></div>';
+  }
+  function feed(a){
+    if(!a||!a.length) return '<p class="muted">No activity recorded yet.</p>';
+    return '<ul class="feed">'+a.slice(0,30).map(x=>'<li><b>'+esc(x.type||'event')+'</b> &nbsp;'+esc(x.repo||'')+' '+
+      (x.number?'#'+esc(x.number):esc((x.sha||'').slice(0,7)))+' — '+esc((x.title||x.message||'').slice(0,140))+'</li>').join('')+'</ul>';
+  }
+
+  /* ---------- turn a response into human-readable HTML ---------- */
+  function renderBody(path, status, text){
+    let d; try{ d=JSON.parse(text); }catch(e){ return '<div class="rc"><p class="err">'+esc(text||'(empty response)')+'</p></div>'; }
+    if(status>=400){
+      const msg=d.detail||d.message||(d.error&&d.error.message)||JSON.stringify(d);
+      return '<div class="rc"><p class="err">⚠ '+esc(msg)+'</p></div>';
+    }
+    const P=path.split('?')[0]; let h='<div class="rc">';
+    if(P.endsWith('/health')){
+      h+='<div class="hl">'+badge('healthy','ok')+'<b>'+esc(d.service||'')+'</b></div>';
+      const x=[]; if('redis'in d)x.push('redis: '+(d.redis?'up':'down')); if('indexed'in d)x.push('indexed docs: '+d.indexed);
+      if(x.length)h+='<p class="muted">'+esc(x.join(' · '))+'</p>';
+    } else if(P.includes('/github/poll')){
+      h+='<h4>Live poll complete</h4><p class="prose">Repository <strong>'+esc(d.repo)+'</strong> ingested <strong>'+esc(d.prs)+'</strong> pull request(s) and <strong>'+esc(d.commits)+'</strong> commit(s). Events were published to the queue.</p>';
+    } else if(P.endsWith('/github/repos')){
+      h+='<h4>Tracked repositories</h4>'+(d.repos&&d.repos.length?'<ul class="feed">'+d.repos.map(r=>'<li>'+esc(r)+'</li>').join('')+'</ul>':'<p class="muted">None yet.</p>');
+    } else if(/\/github\/repos\/.+\/prs$/.test(P)){
+      h+='<h4>Pull requests · '+esc(d.repo)+'</h4>'+prTable(d.pull_requests);
+    } else if(P.includes('/github/simulate')){
+      const p=d.payload||{}; h+='<h4>Demo event published</h4><p class="prose">Published <code>'+esc(d.simulated||'')+'</code> — PR #'+esc(p.number)+' &ldquo;'+esc(p.title)+'&rdquo; in <strong>'+esc(p.repo)+'</strong>.</p>';
+    } else if(P.includes('/rag/context')){
+      h+='<div class="hl"><h4 style="margin:0">Project context · '+esc(d.repo)+'</h4>'+badge((d.documents||0)+' docs','info')+(d.cached?badge('cached','muted'):'')+'</div><div class="prose">'+md(d.summary)+'</div>';
+    } else if(P.includes('/rag/session-start')){
+      h+='<h4>Session context block <span class="muted">(paste into a new session)</span></h4><pre class="block">'+esc(d.block||'')+'</pre>';
+    } else if(P.includes('/reviews/reviews/recent')){
+      const r=d.reviews||[]; h+='<h4>Recent AI reviews ('+r.length+')</h4>'+(r.length?r.map(reviewCard).join(''):'<p class="muted">No reviews yet.</p>');
+    } else if(P.includes('/reviews/reviews/trigger')||/\/reviews\/reviews\//.test(P)){
+      h+=reviewCard(d);
+    } else if(P.includes('/reviews/breaker')){
+      h+='<h4>Circuit breakers</h4>'+breaker('Claude API',d.claude)+breaker('RAG context',d.rag);
+    } else if(P.includes('/reviews/debug/claude-fail')){
+      h+='<h4>Failure injection</h4><p class="prose">Forced-failure mode is '+badge(d.force_fail?'ON':'OFF',d.force_fail?'warn':'ok')+' &nbsp; breaker: '+badge(d.breaker_state||'?', (d.breaker_state==='closed')?'ok':'err')+'</p>';
+    } else if(P.includes('/notify/digest')){
+      h+='<div class="hl"><h4 style="margin:0">Morning digest</h4>'+badge((d.activity_count||0)+' activity','info')+badge((d.review_count||0)+' reviews','info')+'</div>';
+      if(d.generated_at)h+='<p class="muted">generated '+esc(d.generated_at)+'</p>';
+      h+='<div class="prose">'+md(d.digest)+'</div>';
+    } else if(P.includes('/notify/activity')){
+      h+='<h4>Recent activity ('+((d.activity||[]).length)+')</h4>'+feed(d.activity);
+    } else {
+      h+='<pre class="block">'+esc(JSON.stringify(d,null,2))+'</pre>';
+    }
+    return h+'</div>';
+  }
+
+  function addEntry(method,path,status,ms,text){
+    const ok=status>=200&&status<400;
+    let raw=text; try{ raw=JSON.stringify(JSON.parse(text),null,2); }catch(e){}
+    const el=document.createElement('div'); el.className='entry';
+    el.innerHTML=
+      '<div class="bar"><span class="verb '+method+'">'+method+'</span>'+
+      '<span class="path">'+esc(path)+'</span>'+
+      '<span class="code '+(ok?'ok':'err')+'">'+(status||'ERR')+'</span>'+
+      '<span class="ms">'+ms+'ms</span><button class="rawtoggle">raw</button></div>'+
+      '<div class="rendered">'+renderBody(path,status,text)+'</div>'+
+      '<pre class="rawjson" style="display:none">'+esc(raw)+'</pre>';
+    const btn=el.querySelector('.rawtoggle');
+    btn.onclick=()=>{ const pre=el.querySelector('.rawjson'), r=el.querySelector('.rendered'), show=pre.style.display==='none';
+      pre.style.display=show?'block':'none'; r.style.display=show?'none':'block'; btn.textContent=show?'rendered':'raw'; };
+    log.prepend(el); while(log.children.length>25) log.removeChild(log.lastChild);
+  }
+
+  async function call(method,path,body){
+    const t0=performance.now();
+    try{
+      const opt={method};
+      if(body!==undefined){ opt.headers={'content-type':'application/json'}; opt.body=JSON.stringify(body); }
+      const res=await fetch(path,opt); const txt=await res.text();
+      addEntry(method,path,res.status,Math.round(performance.now()-t0),txt);
+    }catch(err){ addEntry(method,path,0,Math.round(performance.now()-t0),'NETWORK ERROR: '+err.message); }
+  }
+
+  function simulatePR(){
+    const n=Math.floor(100+Math.random()*900);
+    call('POST','/api/github/simulate/pr',{repo:repo(),number:n,title:'Refactor service layer for async I/O',author:'dev',body:'Converts blocking handlers to async; touches auth + DB access paths.'});
+  }
+  function triggerReview(){
+    call('POST','/api/reviews/reviews/trigger',{repo:document.getElementById('rrepo').value.trim(),number:parseInt(document.getElementById('prnum').value||'1',10),title:'Review requested from dashboard'});
+  }
+
+  async function pingAll(){
+    const map={github:'/api/github/health',rag:'/api/rag/health',reviews:'/api/reviews/health',notify:'/api/notify/health'};
+    for(const [svc,url] of Object.entries(map)){
+      const dot=document.querySelector('.dot[data-svc="'+svc+'"]'); dot.className='dot wait';
+      try{ const r=await fetch(url); dot.className='dot '+(r.ok?'ok':'err'); }catch(e){ dot.className='dot err'; }
+    }
+  }
+  pingAll(); setInterval(pingAll,15000);
+</script>
+</body>
+</html>

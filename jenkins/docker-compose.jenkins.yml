@@ -1,0 +1,20 @@
+# Local Jenkins LTS with plugins + credentials provisioned via JCasC.
+# Run:  cd jenkins && cp .env.example .env && docker compose -f docker-compose.jenkins.yml up --build -d
+name: dcc-jenkins
+
+services:
+  jenkins:
+    build: .
+    image: dcc-jenkins:local
+    env_file:
+      - .env
+    ports:
+      - "8081:8080"      # Jenkins UI (host 8081 to avoid clashing with the app gateway on 8080)
+      - "50000:50000"    # agent port
+    volumes:
+      - jenkins_home:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock   # lets pipeline build/push images
+    restart: unless-stopped
+
+volumes:
+  jenkins_home:

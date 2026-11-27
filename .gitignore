@@ -1,0 +1,30 @@
+# --- Python ---
+__pycache__/
+*.pyc
+*.egg-info/
+.venv/
+venv/
+
+# --- OS / editor ---
+.DS_Store
+
+# --- Secrets / local-only (NEVER push) ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+kubeconfig
+# any filled-in secret variants (template secrets.yaml is kept)
+k8s/secrets.*.yaml
+jenkins/.env
+digest_latest.txt
+
+# --- Academic / planning / internal docs (keep local, do NOT publish) ---
+# whole docs folder: ANALYSIS, task split, assignment PDF, screenshots, suggestions
+docs/
+architecture.drawio
+implementation-plan.md
+LAB SHEET*.docx
+*.pdf
+*.docx

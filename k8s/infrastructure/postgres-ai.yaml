@@ -1,0 +1,72 @@
+# PostgreSQL for ai-review-service (StatefulSet + headless Service + PVC)
+apiVersion: v1
+kind: Service
+metadata:
+  name: reviews-db
+  namespace: microservices
+spec:
+  clusterIP: None
+  selector:
+    app: reviews-db
+  ports:
+    - port: 5432
+      targetPort: 5432
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: reviews-db
+  namespace: microservices
+spec:
+  serviceName: reviews-db
+  replicas: 1
+  selector:
+    matchLabels:
+      app: reviews-db
+  template:
+    metadata:
+      labels:
+        app: reviews-db
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              value: "reviews"
+            - name: POSTGRES_USER
+              value: "reviews"
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: dcc-secret
+                  key: REVIEWS_DB_PASSWORD
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "reviews", "-d", "reviews"]
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "reviews", "-d", "reviews"]
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          resources:
+            requests: {cpu: "100m", memory: "256Mi"}
+            limits: {cpu: "500m", memory: "512Mi"}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: standard
+        resources:
+          requests:
+            storage: 1Gi

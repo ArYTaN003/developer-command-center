@@ -1,0 +1,60 @@
+# ai-review-service — Deployment + Service
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ai-review-service
+  namespace: microservices
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ai-review-service
+  template:
+    metadata:
+      labels:
+        app: ai-review-service
+    spec:
+      containers:
+        - name: ai-review-service
+          image: YOUR_DOCKERHUB_USER/ai-review-service:1.0.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - configMapRef: {name: dcc-config}
+            - secretRef: {name: dcc-secret}
+          env:
+            - name: DB_HOST
+              value: "reviews-db"
+            - name: DB_PORT
+              value: "5432"
+            - name: DB_NAME
+              value: "reviews"
+            - name: DB_USER
+              value: "reviews"
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: dcc-secret, key: REVIEWS_DB_PASSWORD}
+          readinessProbe:
+            httpGet: {path: /health, port: 8000}
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: {path: /health, port: 8000}
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          resources:
+            requests: {cpu: "100m", memory: "128Mi"}
+            limits: {cpu: "500m", memory: "256Mi"}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ai-review-service
+  namespace: microservices
+spec:
+  selector:
+    app: ai-review-service
+  ports:
+    - port: 8000
+      targetPort: 8000

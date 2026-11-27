@@ -1,0 +1,45 @@
+# Non-secret configuration shared across services.
+# Values here mirror docker-compose defaults so behaviour is identical in both.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dcc-config
+  namespace: microservices
+data:
+  # RabbitMQ
+  RABBITMQ_HOST: "rabbitmq"
+  RABBITMQ_PORT: "5672"
+  RABBITMQ_USER: "guest"
+  RABBITMQ_EVENTS_EXCHANGE: "github.events"
+  RABBITMQ_NOTIFICATIONS_EXCHANGE: "notifications"
+  # Claude / Anthropic (base URL + model only; key is in the Secret)
+  ANTHROPIC_BASE_URL: "https://api.anthropic.com"
+  CLAUDE_MODEL: "claude-haiku-4-5"
+  # Inter-service URLs (Kubernetes DNS — service registry)
+  RAG_CONTEXT_URL: "http://rag-context-service:8000"
+  AI_REVIEW_URL: "http://ai-review-service:8000"
+  # Qdrant
+  QDRANT_HOST: "qdrant"
+  QDRANT_PORT: "6333"
+  QDRANT_COLLECTION: "github_context"
+  # Redis
+  REDIS_HOST: "redis"
+  REDIS_PORT: "6379"
+  # Embeddings
+  EMBEDDING_MODE: "hash"
+  EMBEDDING_DIM: "256"
+  # GitHub
+  GITHUB_API_URL: "https://api.github.com"
+  GITHUB_REPOS: "octocat/hello-world"
+  GITHUB_POLL_ENABLED: "false"
+  GITHUB_POLL_INTERVAL_MINUTES: "10"
+  # Circuit breakers
+  CLAUDE_BREAKER_FAIL_MAX: "2"
+  CLAUDE_BREAKER_RESET_TIMEOUT: "10"
+  GITHUB_BREAKER_FAIL_MAX: "5"
+  GITHUB_BREAKER_RESET_TIMEOUT: "30"
+  RAG_BREAKER_FAIL_MAX: "3"
+  RAG_BREAKER_RESET_TIMEOUT: "15"
+  # Digest schedule
+  DIGEST_CRON_HOUR: "8"
+  DIGEST_CRON_MINUTE: "0"

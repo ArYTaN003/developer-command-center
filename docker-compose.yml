@@ -1,0 +1,202 @@
+# ==========================================================================
+# Developer Command Center — full local stack
+# One command:  docker compose up --build
+# Brings up: 2x PostgreSQL, Redis, Qdrant, RabbitMQ, NGINX gateway + 4 services
+# Health-based start order via depends_on.condition: service_healthy
+# ==========================================================================
+name: developer-command-center
+
+x-service-env: &service-env
+  RABBITMQ_HOST: rabbitmq
+  RABBITMQ_PORT: "5672"
+  RABBITMQ_USER: ${RABBITMQ_USER:-guest}
+  RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-guest}
+  RABBITMQ_EVENTS_EXCHANGE: ${RABBITMQ_EVENTS_EXCHANGE:-github.events}
+  RABBITMQ_NOTIFICATIONS_EXCHANGE: ${RABBITMQ_NOTIFICATIONS_EXCHANGE:-notifications}
+
+services:
+  # -------------------- Infrastructure --------------------
+  github-db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: ${GITHUB_DB_NAME:-github}
+      POSTGRES_USER: ${GITHUB_DB_USER:-github}
+      POSTGRES_PASSWORD: ${GITHUB_DB_PASSWORD:-github}
+    volumes:
+      - github-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${GITHUB_DB_USER:-github} -d ${GITHUB_DB_NAME:-github}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks: [dcc-net]
+
+  reviews-db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: ${REVIEWS_DB_NAME:-reviews}
+      POSTGRES_USER: ${REVIEWS_DB_USER:-reviews}
+      POSTGRES_PASSWORD: ${REVIEWS_DB_PASSWORD:-reviews}
+    volumes:
+      - reviews-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${REVIEWS_DB_USER:-reviews} -d ${REVIEWS_DB_NAME:-reviews}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks: [dcc-net]
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "60", "1"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks: [dcc-net]
+
+  qdrant:
+    image: qdrant/qdrant:v1.12.1
+    volumes:
+      - qdrant-data:/qdrant/storage
+    healthcheck:
+      # Qdrant image has no curl/wget; use the bash /dev/tcp probe
+      test: ["CMD-SHELL", "bash -c '</dev/tcp/localhost/6333' || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [dcc-net]
+
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-guest}
+    ports:
+      - "15672:15672"   # Management UI (http://localhost:15672, guest/guest)
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_running"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+    networks: [dcc-net]
+
+  # -------------------- Application services --------------------
+  github-service:
+    build: ./services/github-service
+    image: ${DOCKERHUB_USER:-dcc}/github-service:1.0.0
+    environment:
+      <<: *service-env
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-PLACEHOLDER_GITHUB_TOKEN}
+      GITHUB_API_URL: ${GITHUB_API_URL:-https://api.github.com}
+      GITHUB_REPOS: ${GITHUB_REPOS:-octocat/hello-world}
+      GITHUB_POLL_ENABLED: ${GITHUB_POLL_ENABLED:-false}
+      GITHUB_POLL_INTERVAL_MINUTES: ${GITHUB_POLL_INTERVAL_MINUTES:-10}
+      GITHUB_BREAKER_FAIL_MAX: ${GITHUB_BREAKER_FAIL_MAX:-5}
+      GITHUB_BREAKER_RESET_TIMEOUT: ${GITHUB_BREAKER_RESET_TIMEOUT:-30}
+      DB_HOST: github-db
+      DB_PORT: "5432"
+      DB_NAME: ${GITHUB_DB_NAME:-github}
+      DB_USER: ${GITHUB_DB_USER:-github}
+      DB_PASSWORD: ${GITHUB_DB_PASSWORD:-github}
+    depends_on:
+      github-db: {condition: service_healthy}
+      rabbitmq: {condition: service_healthy}
+    networks: [dcc-net]
+
+  rag-context-service:
+    build: ./services/rag-context-service
+    image: ${DOCKERHUB_USER:-dcc}/rag-context-service:1.0.0
+    # Claude config (ANTHROPIC_*/CLAUDE_MODEL) comes from the .env FILE so an
+    # ambient ANTHROPIC_BASE_URL in the shell can't override it. required:false
+    # keeps zero-config (stub mode) working when no .env exists.
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      <<: *service-env
+      QDRANT_HOST: qdrant
+      QDRANT_PORT: "6333"
+      QDRANT_COLLECTION: ${QDRANT_COLLECTION:-github_context}
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      EMBEDDING_MODE: ${EMBEDDING_MODE:-hash}
+      EMBEDDING_DIM: ${EMBEDDING_DIM:-256}
+    depends_on:
+      qdrant: {condition: service_healthy}
+      redis: {condition: service_healthy}
+      rabbitmq: {condition: service_healthy}
+    networks: [dcc-net]
+
+  ai-review-service:
+    build: ./services/ai-review-service
+    image: ${DOCKERHUB_USER:-dcc}/ai-review-service:1.0.0
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      <<: *service-env
+      RAG_CONTEXT_URL: http://rag-context-service:8000
+      CLAUDE_BREAKER_FAIL_MAX: ${CLAUDE_BREAKER_FAIL_MAX:-2}
+      CLAUDE_BREAKER_RESET_TIMEOUT: ${CLAUDE_BREAKER_RESET_TIMEOUT:-10}
+      RAG_BREAKER_FAIL_MAX: ${RAG_BREAKER_FAIL_MAX:-3}
+      RAG_BREAKER_RESET_TIMEOUT: ${RAG_BREAKER_RESET_TIMEOUT:-15}
+      DB_HOST: reviews-db
+      DB_PORT: "5432"
+      DB_NAME: ${REVIEWS_DB_NAME:-reviews}
+      DB_USER: ${REVIEWS_DB_USER:-reviews}
+      DB_PASSWORD: ${REVIEWS_DB_PASSWORD:-reviews}
+    depends_on:
+      reviews-db: {condition: service_healthy}
+      rabbitmq: {condition: service_healthy}
+      rag-context-service: {condition: service_started}
+    networks: [dcc-net]
+
+  notification-service:
+    build: ./services/notification-service
+    image: ${DOCKERHUB_USER:-dcc}/notification-service:1.0.0
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      <<: *service-env
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      AI_REVIEW_URL: http://ai-review-service:8000
+      DIGEST_CRON_HOUR: ${DIGEST_CRON_HOUR:-8}
+      DIGEST_CRON_MINUTE: ${DIGEST_CRON_MINUTE:-0}
+    depends_on:
+      redis: {condition: service_healthy}
+      rabbitmq: {condition: service_healthy}
+    networks: [dcc-net]
+
+  # -------------------- API Gateway (NGINX) --------------------
+  gateway:
+    image: nginx:1.27-alpine
+    ports:
+      - "8080:80"   # Dashboard + API: http://localhost:8080
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./web:/usr/share/nginx/html:ro
+    depends_on:
+      - github-service
+      - rag-context-service
+      - ai-review-service
+      - notification-service
+    networks: [dcc-net]
+
+networks:
+  dcc-net:
+    driver: bridge
+
+volumes:
+  github-db-data:
+  reviews-db-data:
+  redis-data:
+  qdrant-data:
+  rabbitmq-data:

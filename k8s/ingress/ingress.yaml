@@ -1,0 +1,44 @@
+# API Gateway via Kubernetes Ingress (NGINX ingress controller).
+# Enable on Minikube:  minikube addons enable ingress
+#
+# Single entry point; path prefixes route to each service and are rewritten
+# so the service receives the path without the /api/<svc> prefix.
+# Add to /etc/hosts:  <minikube ip>  dcc.local
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: dcc-ingress
+  namespace: microservices
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    nginx.ingress.kubernetes.io/use-regex: "true"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: dcc.local
+      http:
+        paths:
+          - path: /api/github(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: github-service
+                port: {number: 8000}
+          - path: /api/rag(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: rag-context-service
+                port: {number: 8000}
+          - path: /api/reviews(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: ai-review-service
+                port: {number: 8000}
+          - path: /api/notify(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: notification-service
+                port: {number: 8000}

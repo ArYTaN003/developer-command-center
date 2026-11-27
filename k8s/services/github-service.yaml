@@ -1,0 +1,60 @@
+# github-service — Deployment + Service
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: github-service
+  namespace: microservices
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: github-service
+  template:
+    metadata:
+      labels:
+        app: github-service
+    spec:
+      containers:
+        - name: github-service
+          image: YOUR_DOCKERHUB_USER/github-service:1.0.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - configMapRef: {name: dcc-config}
+            - secretRef: {name: dcc-secret}
+          env:
+            - name: DB_HOST
+              value: "github-db"
+            - name: DB_PORT
+              value: "5432"
+            - name: DB_NAME
+              value: "github"
+            - name: DB_USER
+              value: "github"
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: dcc-secret, key: GITHUB_DB_PASSWORD}
+          readinessProbe:
+            httpGet: {path: /health, port: 8000}
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: {path: /health, port: 8000}
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          resources:
+            requests: {cpu: "100m", memory: "128Mi"}
+            limits: {cpu: "500m", memory: "256Mi"}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: github-service
+  namespace: microservices
+spec:
+  selector:
+    app: github-service
+  ports:
+    - port: 8000
+      targetPort: 8000

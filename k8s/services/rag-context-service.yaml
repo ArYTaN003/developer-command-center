@@ -1,0 +1,68 @@
+# rag-context-service — Deployment (2 replicas, self-healing demo) + Service + HPA
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rag-context-service
+  namespace: microservices
+spec:
+  replicas: 2            # >=2 replicas: used for the self-healing demo
+  selector:
+    matchLabels:
+      app: rag-context-service
+  template:
+    metadata:
+      labels:
+        app: rag-context-service
+    spec:
+      containers:
+        - name: rag-context-service
+          image: YOUR_DOCKERHUB_USER/rag-context-service:1.0.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - configMapRef: {name: dcc-config}
+            - secretRef: {name: dcc-secret}
+          readinessProbe:
+            httpGet: {path: /health, port: 8000}
+            initialDelaySeconds: 20     # Qdrant client init takes a few seconds
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: {path: /health, port: 8000}
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          resources:
+            requests: {cpu: "150m", memory: "192Mi"}
+            limits: {cpu: "750m", memory: "384Mi"}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rag-context-service
+  namespace: microservices
+spec:
+  selector:
+    app: rag-context-service
+  ports:
+    - port: 8000
+      targetPort: 8000
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: rag-context-service
+  namespace: microservices
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: rag-context-service
+  minReplicas: 2
+  maxReplicas: 6
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
