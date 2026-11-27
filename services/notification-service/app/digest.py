@@ -24,6 +24,19 @@ async def _fetch_recent_reviews() -> list[dict]:
         return []
 
 
+async def _deliver_to_slack(text: str) -> None:
+    """Push the digest to a Slack incoming webhook, if one is configured."""
+    if not settings.slack_webhook_url:
+        return
+    try:
+        async with httpx.AsyncClient(timeout=6.0) as c:
+            resp = await c.post(settings.slack_webhook_url, json={"text": text})
+            resp.raise_for_status()
+        log.info("Digest delivered to Slack")
+    except Exception as exc:
+        log.warning("Slack delivery failed: %s", exc)
+
+
 async def build_digest() -> dict:
     activity = await recent_activity(50)
     reviews = await _fetch_recent_reviews()
@@ -57,6 +70,7 @@ async def build_digest() -> dict:
         "digest": text,
     }
     await save_digest(digest)
+    await _deliver_to_slack(text)
     log.info("Digest generated (%d activity, %d reviews)", len(activity), len(reviews))
     return digest
 

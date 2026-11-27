@@ -14,6 +14,12 @@ class Settings(BaseSettings):
     github_poll_enabled: bool = False
     github_poll_interval_minutes: int = 10
 
+    # --- Security / write actions (empty defaults = open, so local demo works) ---
+    webhook_secret: str = ""      # if set, /webhook requires a valid X-Hub-Signature-256
+    api_key: str = ""             # if set, /poll and /simulate/* require X-API-Key
+    merge_method: str = "merge"   # merge | squash | rebase (used by PUT .../merge)
+    max_diff_chars: int = 20000   # cap the PR diff returned by GET .../prs/{n}/diff
+
     # --- Circuit breaker for outbound GitHub calls ---
     github_breaker_fail_max: int = 5
     github_breaker_reset_timeout: int = 30
@@ -31,6 +37,7 @@ class Settings(BaseSettings):
     rabbitmq_user: str = "guest"
     rabbitmq_password: str = "guest"
     rabbitmq_events_exchange: str = "github.events"
+    rabbitmq_notifications_exchange: str = "notifications"
 
     @property
     def database_url(self) -> str:

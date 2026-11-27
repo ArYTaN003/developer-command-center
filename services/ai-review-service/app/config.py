@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     # --- RAG context service (sync dependency) ---
     rag_context_url: str = "http://rag-context-service:8000"
 
+    # --- github-service (for fetching PR diffs to review real code) ---
+    github_service_url: str = "http://github-service:8000"
+
     # --- PostgreSQL (reviews-db) ---
     db_host: str = "reviews-db"
     db_port: int = 5432
