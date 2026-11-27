@@ -162,7 +162,7 @@
       <summary>▸ HOW TO TEST — step by step</summary>
       <ol>
         <li><b>Check health</b> — top-right dots should all be green. Click <code>↻ health</code> to recheck.</li>
-        <li><b>01 Ingest</b> — set your repo, click <b>Run live poll</b> to pull real PRs/commits (or <b>Simulate PR</b> for a demo event). Then <b>List PRs</b> to see them.</li>
+        <li><b>01 Ingest</b> — set your repo, click <b>Run live poll</b> to pull real PRs/commits (or <b>Simulate PR</b> for a demo event). Then <b>List PRs</b> to see them. Each PR card has <b>Merge · Comment · Delete branch · Untrack</b> actions (GitHub writes need a real token; <b>Untrack</b> always works).</li>
         <li><b>02 Context</b> — click <b>Get project context</b> for an AI summary of recent activity.</li>
         <li><b>03 Review</b> — set repo + PR number, click <b>Trigger AI review</b>; read the review. <b>Recent reviews</b> lists all.</li>
         <li><b>04 Notify</b> — click <b>Generate digest</b>, then <b>Latest digest</b> for the morning brief.</li>
@@ -247,6 +247,7 @@
   const repoQ = () => encodeURIComponent(repo());
   const log   = document.getElementById('log');
   const esc   = s => (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  let WRITE_ENABLED = false;   // GitHub write capability (set from /api/github/health)
 
   /* ---------- tiny markdown renderer (for Claude output + digest) ---------- */
   function mdInline(s){
@@ -279,10 +280,39 @@
     return '<div class="review-card"><div class="hl">'+badge(r.degraded?'degraded':'ai review',r.degraded?'warn':'ok')+
       '<span class="muted">'+esc(r.pr_id||r.repo||'')+'</span></div><div class="prose">'+md(r.summary)+'</div></div>';
   }
-  function prTable(prs){
+  function prBtn(label, handler, enabled, tip){
+    const dis = enabled ? '' : ' disabled style="opacity:.45;cursor:not-allowed"';
+    const t   = (!enabled && tip) ? ' title="'+esc(tip)+'"' : '';
+    const on  = enabled ? ' onclick="'+handler+'"' : '';
+    return '<button class="act"'+on+dis+t+'>'+esc(label)+'</button>';
+  }
+  function prCard(p, repo){
+    const merged = !!p.merged || p.state==='merged';
+    const rj = String(repo).replace(/'/g,"\\'");
+    const canMerge  = WRITE_ENABLED && p.state==='open';
+    const canBranch = WRITE_ENABLED && merged && !!p.head_branch;
+    const writeTip  = 'Needs a real GITHUB_TOKEN with write scope';
+    const stateCls  = p.state==='open'?'ok':(merged?'info':'muted');
+    return '<div class="review-card">'+
+      '<div class="hl">'+badge('#'+esc(p.number),'muted')+badge(p.state,stateCls)+
+        (merged?badge('merged','info'):'')+'<span class="muted">'+esc(p.author||'')+'</span></div>'+
+      '<div class="prose" style="margin-bottom:10px"><strong>'+esc(p.title||'(untitled)')+'</strong>'+
+        (p.head_branch?' <span class="muted">· '+esc(p.head_branch)+'</span>':'')+'</div>'+
+      '<div class="row" style="margin-bottom:8px">'+
+        prBtn('Merge', "mergePR('"+rj+"',"+p.number+")", canMerge, p.state!=='open'?'PR is not open':writeTip)+
+        prBtn('Delete branch', "deleteBranch('"+rj+"',"+p.number+")", canBranch, !merged?'PR must be merged first':writeTip)+
+        prBtn('Untrack', "untrackPR('"+rj+"',"+p.number+")", true, '')+
+        prBtn('Diff', "viewDiff('"+rj+"',"+p.number+")", WRITE_ENABLED, writeTip)+
+      '</div>'+
+      '<div class="inline" style="gap:8px">'+
+        '<input type="text" id="cmt_'+esc(p.number)+'" placeholder="comment on this PR…"'+(WRITE_ENABLED?'':' disabled title="'+esc(writeTip)+'"')+' />'+
+        prBtn('Post', "postComment('"+rj+"',"+p.number+")", WRITE_ENABLED, writeTip)+
+      '</div>'+
+    '</div>';
+  }
+  function prTable(prs, repo){
     if(!prs||!prs.length) return '<p class="muted">No pull requests stored yet. Run a live poll first.</p>';
-    return '<table class="tbl"><thead><tr><th>#</th><th>Title</th><th>State</th><th>Author</th></tr></thead><tbody>'+
-      prs.map(p=>'<tr><td>'+esc(p.number)+'</td><td>'+esc(p.title)+'</td><td>'+badge(p.state,p.state==='open'?'ok':'muted')+'</td><td>'+esc(p.author||'')+'</td></tr>').join('')+'</tbody></table>';
+    return prs.map(p=>prCard(p, repo)).join('');
   }
   function breaker(name,b){
     if(!b) return '';
@@ -313,7 +343,7 @@
     } else if(P.endsWith('/github/repos')){
       h+='<h4>Tracked repositories</h4>'+(d.repos&&d.repos.length?'<ul class="feed">'+d.repos.map(r=>'<li>'+esc(r)+'</li>').join('')+'</ul>':'<p class="muted">None yet.</p>');
     } else if(/\/github\/repos\/.+\/prs$/.test(P)){
-      h+='<h4>Pull requests · '+esc(d.repo)+'</h4>'+prTable(d.pull_requests);
+      h+='<h4>Pull requests · '+esc(d.repo)+'</h4>'+prTable(d.pull_requests, d.repo);
     } else if(P.includes('/github/simulate')){
       const p=d.payload||{}; h+='<h4>Demo event published</h4><p class="prose">Published <code>'+esc(d.simulated||'')+'</code> — PR #'+esc(p.number)+' &ldquo;'+esc(p.title)+'&rdquo; in <strong>'+esc(p.repo)+'</strong>.</p>';
     } else if(P.includes('/rag/context')){
@@ -334,6 +364,21 @@
       h+='<div class="prose">'+md(d.digest)+'</div>';
     } else if(P.includes('/notify/activity')){
       h+='<h4>Recent activity ('+((d.activity||[]).length)+')</h4>'+feed(d.activity);
+    } else if(/\/prs\/\d+\/diff$/.test(P)){
+      h+='<h4>Diff · '+esc(d.repo)+' #'+esc(d.number)+'</h4>';
+      h+='<p class="muted">'+esc(d.file_count)+' file(s) · '+esc(d.diff_chars)+' chars'+(d.truncated?' · showing first '+esc(d.returned_chars):'')+'</p>';
+      if(d.files&&d.files.length) h+='<ul class="feed">'+d.files.map(f=>'<li>'+esc(f.status)+' <b>'+esc(f.filename)+'</b> <span class="muted">+'+esc(f.additions)+' −'+esc(f.deletions)+'</span></li>').join('')+'</ul>';
+      h+='<pre class="block">'+esc(d.diff||'(empty)')+'</pre>';
+    } else if(/\/prs\/\d+\/merge$/.test(P)){
+      h+='<h4>Merge</h4><p class="prose">'+badge('merged','ok')+' PR #'+esc(d.number)+' in <strong>'+esc(d.repo)+'</strong>'+(d.sha?' · <code>'+esc(String(d.sha).slice(0,10))+'</code>':'')+'</p>';
+    } else if(/\/prs\/\d+\/comments$/.test(P)){
+      h+='<h4>Comment posted</h4><p class="prose">On PR #'+esc(d.number)+' in <strong>'+esc(d.repo)+'</strong>'+(d.comment_url?' — <a href="'+esc(d.comment_url)+'" target="_blank" rel="noopener">view on GitHub</a>':'')+'</p>';
+    } else if(/\/prs\/\d+\/branch$/.test(P)){
+      h+='<h4>Branch deleted</h4><p class="prose">Deleted <code>'+esc(d.deleted_branch)+'</code> for PR #'+esc(d.number)+' in <strong>'+esc(d.repo)+'</strong>.</p>';
+    } else if(/\/repos\/[^/]+\/[^/]+\/prs\/\d+$/.test(P)){
+      h+='<h4>Stopped tracking PR</h4><p class="prose">Removed PR #'+esc(d.number)+' from local tracking ('+esc(d.deleted_pr)+' row). GitHub is untouched.</p>';
+    } else if(/\/repos\/[^/]+\/[^/]+$/.test(P)){
+      h+='<h4>Stopped tracking repo</h4><p class="prose">Removed <strong>'+esc(d.repo||'')+'</strong> locally — repo:'+esc(d.deleted_repo)+' · prs:'+esc(d.prs)+' · issues:'+esc(d.issues)+' · commits:'+esc(d.commits)+'. GitHub is untouched.</p>';
     } else {
       h+='<pre class="block">'+esc(JSON.stringify(d,null,2))+'</pre>';
     }
@@ -375,11 +420,40 @@
     call('POST','/api/reviews/reviews/trigger',{repo:document.getElementById('rrepo').value.trim(),number:parseInt(document.getElementById('prnum').value||'1',10),title:'Review requested from dashboard'});
   }
 
+  /* ---------- PR actions (Update / Delete verbs) ---------- */
+  function refreshPRs(repo){ call('GET','/api/github/repos/'+repo+'/prs'); }
+  async function mergePR(repo,n){
+    if(!confirm('Merge PR #'+n+' in '+repo+' on GitHub?')) return;
+    await call('PUT','/api/github/repos/'+repo+'/prs/'+n+'/merge');
+    refreshPRs(repo);
+  }
+  async function deleteBranch(repo,n){
+    if(!confirm('Delete the merged branch for PR #'+n+'? This cannot be undone.')) return;
+    await call('DELETE','/api/github/repos/'+repo+'/prs/'+n+'/branch');
+    refreshPRs(repo);
+  }
+  async function untrackPR(repo,n){
+    if(!confirm('Stop tracking PR #'+n+' locally? GitHub is not touched.')) return;
+    await call('DELETE','/api/github/repos/'+repo+'/prs/'+n);
+    refreshPRs(repo);
+  }
+  function postComment(repo,n){
+    const el=document.getElementById('cmt_'+n);
+    const body=((el&&el.value)||'').trim();
+    if(!body){ alert('Enter a comment first.'); return; }
+    call('POST','/api/github/repos/'+repo+'/prs/'+n+'/comments',{body:body});
+    if(el) el.value='';
+  }
+  function viewDiff(repo,n){ call('GET','/api/github/repos/'+repo+'/prs/'+n+'/diff'); }
+
   async function pingAll(){
     const map={github:'/api/github/health',rag:'/api/rag/health',reviews:'/api/reviews/health',notify:'/api/notify/health'};
     for(const [svc,url] of Object.entries(map)){
       const dot=document.querySelector('.dot[data-svc="'+svc+'"]'); dot.className='dot wait';
-      try{ const r=await fetch(url); dot.className='dot '+(r.ok?'ok':'err'); }catch(e){ dot.className='dot err'; }
+      try{
+        const r=await fetch(url); dot.className='dot '+(r.ok?'ok':'err');
+        if(svc==='github' && r.ok){ try{ const j=await r.json(); WRITE_ENABLED=!!j.github_write_enabled; }catch(e){} }
+      }catch(e){ dot.className='dot err'; }
     }
   }
   pingAll(); setInterval(pingAll,15000);

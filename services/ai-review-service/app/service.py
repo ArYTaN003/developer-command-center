@@ -6,6 +6,7 @@ from fnmatch import fnmatch
 from sqlalchemy import select
 
 from .models import PromptTemplate, Review, SessionLocal
+from .github_client import fetch_pr_diff
 from .grpc_rag_client import get_context  # Lab 3B: fetch project context over gRPC (was rag_client REST)
 from .reviewer import generate_review
 
@@ -26,10 +27,11 @@ async def _select_template(repo: str) -> dict:
 
 async def run_review(repo: str, pr: dict) -> dict:
     template = await _select_template(repo)
-    # Run the blocking calls (gRPC context fetch + Claude SDK) OFF the event loop
-    # so the consumer can process multiple prefetched messages concurrently.
+    # Run the blocking calls (gRPC context fetch, diff fetch, Claude SDK) OFF the
+    # event loop so the consumer can process multiple prefetched messages concurrently.
     context, ctx_degraded = await asyncio.to_thread(get_context, repo)
-    summary, ai_degraded = await asyncio.to_thread(generate_review, repo, pr, context, template)
+    diff = await asyncio.to_thread(fetch_pr_diff, repo, int(pr.get("number", 0)))
+    summary, ai_degraded = await asyncio.to_thread(generate_review, repo, pr, context, template, diff)
     degraded = 1 if (ctx_degraded or ai_degraded) else 0
 
     pr_id = pr.get("id") or f"pr-{repo}-{pr.get('number')}"

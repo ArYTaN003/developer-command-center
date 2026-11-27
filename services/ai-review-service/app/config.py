@@ -23,6 +23,9 @@ class Settings(BaseSettings):
     # gRPC target for the ContextService (Lab 3B); same DNS in Compose and K8s.
     rag_grpc_target: str = "rag-context-service:50051"
 
+    # --- github-service (for fetching PR diffs to review real code) ---
+    github_service_url: str = "http://github-service:8000"
+
     # --- PostgreSQL (reviews-db) ---
     db_host: str = "reviews-db"
     db_port: int = 5432

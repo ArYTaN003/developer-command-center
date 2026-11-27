@@ -1,7 +1,7 @@
 """SQLAlchemy models + async engine for github-service (github-db)."""
 from datetime import datetime, timezone
 
-from sqlalchemy import String, Integer, DateTime, Text, UniqueConstraint
+from sqlalchemy import String, Integer, DateTime, Text, Boolean, UniqueConstraint
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -33,6 +33,8 @@ class PullRequest(Base):
     state: Mapped[str] = mapped_column(String(32), default="open")
     author: Mapped[str] = mapped_column(String(255), default="")
     body: Mapped[str] = mapped_column(Text, default="")
+    merged: Mapped[bool] = mapped_column(Boolean, default=False)
+    head_branch: Mapped[str] = mapped_column(String(255), default="")
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
 

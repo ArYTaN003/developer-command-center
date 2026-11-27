@@ -99,6 +99,10 @@ services:
       GITHUB_POLL_INTERVAL_MINUTES: ${GITHUB_POLL_INTERVAL_MINUTES:-10}
       GITHUB_BREAKER_FAIL_MAX: ${GITHUB_BREAKER_FAIL_MAX:-5}
       GITHUB_BREAKER_RESET_TIMEOUT: ${GITHUB_BREAKER_RESET_TIMEOUT:-30}
+      # Security guards + PR write actions (fixes/person-a). Empty = open (local demo).
+      WEBHOOK_SECRET: ${WEBHOOK_SECRET:-}
+      API_KEY: ${API_KEY:-}
+      MERGE_METHOD: ${MERGE_METHOD:-merge}
       DB_HOST: github-db
       DB_PORT: "5432"
       DB_NAME: ${GITHUB_DB_NAME:-github}
@@ -142,6 +146,7 @@ services:
     environment:
       <<: *service-env
       RAG_CONTEXT_URL: http://rag-context-service:8000
+      GITHUB_SERVICE_URL: http://github-service:8000
       CLAUDE_BREAKER_FAIL_MAX: ${CLAUDE_BREAKER_FAIL_MAX:-2}
       CLAUDE_BREAKER_RESET_TIMEOUT: ${CLAUDE_BREAKER_RESET_TIMEOUT:-10}
       RAG_BREAKER_FAIL_MAX: ${RAG_BREAKER_FAIL_MAX:-3}
@@ -170,6 +175,9 @@ services:
       AI_REVIEW_URL: http://ai-review-service:8000
       DIGEST_CRON_HOUR: ${DIGEST_CRON_HOUR:-8}
       DIGEST_CRON_MINUTE: ${DIGEST_CRON_MINUTE:-0}
+      # fixes/person-a: optional Slack push + bounded dedup TTL
+      SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL:-}
+      DEDUP_TTL_SECONDS: ${DEDUP_TTL_SECONDS:-604800}
     depends_on:
       redis: {condition: service_healthy}
       rabbitmq: {condition: service_healthy}

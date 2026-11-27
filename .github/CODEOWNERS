@@ -1,0 +1,10 @@
+# Code owners for developer-command-center
+#
+# Each line maps a path to the owners who are auto-requested for review.
+# NOTE: this only *enforces* review if "Require review from Code Owners" is
+# enabled in the main-branch protection rule. It is currently OFF, so this file
+# just auto-requests these reviewers; it does not block merges by itself.
+#
+# Both maintainers own everything, so each person's PR can be approved by the
+# other (you cannot approve your own PR).
+* @ArYTaN003 @Sazzz-017

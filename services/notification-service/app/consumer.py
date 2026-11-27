@@ -16,10 +16,21 @@ log = logging.getLogger("notification-service.consumer")
 
 
 async def _on_message(message: aio_pika.abc.AbstractIncomingMessage) -> None:
-    async with message.process(requeue=True):
-        event = json.loads(message.body.decode())
-        new = await record_activity(event)
-        log.info("Activity %s (new=%s)", event.get("id"), new)
+    # requeue=False: a bad/poison message is NACKed to the dead-letter exchange
+    # instead of being requeued forever (which caused a hot loop / CPU spin).
+    try:
+        async with message.process(requeue=False):
+            event = json.loads(message.body.decode())
+            new = await record_activity(event)
+            log.info("Activity %s (new=%s)", event.get("id"), new)
+    except Exception as exc:
+        # message.process already NACKed (requeue=False) → routed to DLQ.
+        deaths = 0
+        try:
+            deaths = (message.headers or {}).get("x-death", [{}])[0].get("count", 0)
+        except Exception:
+            pass
+        log.warning("Dead-lettering message (prior deaths=%s): %s", deaths, exc)
 
 
 async def run_consumer() -> None:
@@ -27,20 +38,31 @@ async def run_consumer() -> None:
     channel = await conn.channel()
     await channel.set_qos(prefetch_count=10)
 
-    # github.events (activity feed)
+    # Dead-letter exchange + queue for poison / persistently failing messages.
+    dlx = await channel.declare_exchange("dlx", aio_pika.ExchangeType.DIRECT, durable=True)
+    dead_queue = await channel.declare_queue("notification.activity.dead", durable=True)
+    await dead_queue.bind(dlx, routing_key="notification.activity.dead")
+
+    # github.events (activity feed) — main queue routes failures to the DLX.
     events_exchange = await channel.declare_exchange(
         settings.rabbitmq_events_exchange, aio_pika.ExchangeType.TOPIC, durable=True
     )
-    queue = await channel.declare_queue("notification.activity", durable=True)
+    queue = await channel.declare_queue(
+        "notification.activity", durable=True,
+        arguments={
+            "x-dead-letter-exchange": "dlx",
+            "x-dead-letter-routing-key": "notification.activity.dead",
+        },
+    )
     for key in ["pr.opened", "pr.closed", "commit.pushed", "issue.created"]:
         await queue.bind(events_exchange, routing_key=key)
 
-    # notifications exchange (direct alerts) — declared for architectural completeness
+    # notifications exchange (direct alerts) — now genuinely published to by github-service.
     notif_exchange = await channel.declare_exchange(
         settings.rabbitmq_notifications_exchange, aio_pika.ExchangeType.DIRECT, durable=True
     )
     await queue.bind(notif_exchange, routing_key="alert")
 
-    log.info("notification consumer bound to github.events + notifications")
+    log.info("notification consumer bound to github.events + notifications (DLQ: notification.activity.dead)")
     await queue.consume(_on_message)
     await asyncio.Future()
