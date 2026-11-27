@@ -15,6 +15,10 @@ class Settings(BaseSettings):
     # --- Redis ---
     redis_host: str = "redis"
     redis_port: int = 6379
+    dedup_ttl_seconds: int = 604800   # 7 days — bounds the dedup footprint (A5)
+
+    # --- Slack delivery (optional push channel; empty = disabled) ---
+    slack_webhook_url: str = ""
 
     # --- RabbitMQ ---
     rabbitmq_host: str = "rabbitmq"

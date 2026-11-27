@@ -9,7 +9,7 @@ from .config import settings
 _redis = redis.Redis(host=settings.redis_host, port=settings.redis_port, decode_responses=True)
 
 _ACTIVITY_KEY = "notify:activity"        # list (recent events)
-_DEDUP_KEY = "notify:seen"               # set (event ids already processed)
+_DEDUP_PREFIX = "notify:seen:"           # per-event key with TTL (self-trimming)
 _DIGEST_KEY = "notify:digest:latest"     # string (JSON)
 
 
@@ -21,9 +21,15 @@ async def ping() -> bool:
 
 
 async def record_activity(event: dict) -> bool:
-    """Store an event unless already seen (dedup). Returns True if newly stored."""
+    """Store an event unless already seen (dedup). Returns True if newly stored.
+
+    Dedup uses a per-event key with a TTL (SET NX EX) instead of one unbounded
+    set, so the dedup footprint self-trims and can never leak memory forever.
+    """
     event_id = event.get("id") or f"{event.get('type')}-{event.get('repo')}-{event.get('number')}"
-    added = await _redis.sadd(_DEDUP_KEY, event_id)
+    added = await _redis.set(
+        _DEDUP_PREFIX + str(event_id), "1", nx=True, ex=settings.dedup_ttl_seconds
+    )
     if not added:
         return False
     entry = json.dumps({"ts": time.time(), **event})

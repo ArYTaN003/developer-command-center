@@ -5,6 +5,7 @@ from fnmatch import fnmatch
 from sqlalchemy import select
 
 from .models import PromptTemplate, Review, SessionLocal
+from .github_client import fetch_pr_diff
 from .rag_client import get_context
 from .reviewer import generate_review
 
@@ -28,7 +29,8 @@ async def _select_template(repo: str) -> dict:
 async def run_review(repo: str, pr: dict) -> dict:
     template = await _select_template(repo)
     context, ctx_degraded = get_context(repo)
-    summary, ai_degraded = generate_review(repo, pr, context, template)
+    diff = fetch_pr_diff(repo, int(pr.get("number", 0)))
+    summary, ai_degraded = generate_review(repo, pr, context, template, diff)
     degraded = 1 if (ctx_degraded or ai_degraded) else 0
 
     pr_id = pr.get("id") or f"pr-{repo}-{pr.get('number')}"

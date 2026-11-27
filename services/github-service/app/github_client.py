@@ -52,5 +52,63 @@ class GitHubClient:
     async def list_commits(self, repo: str) -> list[dict]:
         return await self._get(f"/repos/{repo}/commits?per_page=20")  # type: ignore
 
+    # -------- Write path (merge / comment / delete branch) --------
+    # Breaker-wrapped but NOT retried: writes are not idempotent (a retried
+    # comment would double-post), so we attempt once and surface the error.
+    @github_breaker
+    async def _request(self, method: str, path: str, json: dict | None = None):
+        if settings.github_token_is_placeholder:
+            raise RuntimeError(
+                "GITHUB_TOKEN is a placeholder — set a real PAT with write scope "
+                "to merge, comment, or delete branches."
+            )
+        url = f"{settings.github_api_url}{path}"
+        async with httpx.AsyncClient(timeout=15.0, headers=self._headers) as c:
+            resp = await c.request(method, url, json=json)
+            resp.raise_for_status()
+            if resp.status_code == 204 or not resp.content:
+                return None
+            return resp.json()
+
+    async def get_pull_request(self, repo: str, number: int) -> dict:
+        return await self._request("GET", f"/repos/{repo}/pulls/{number}")  # type: ignore
+
+    async def merge_pull_request(self, repo: str, number: int, method: str = "merge") -> dict:
+        return await self._request(  # type: ignore
+            "PUT", f"/repos/{repo}/pulls/{number}/merge", {"merge_method": method}
+        )
+
+    async def comment_on_pull_request(self, repo: str, number: int, body: str) -> dict:
+        return await self._request(  # type: ignore
+            "POST", f"/repos/{repo}/issues/{number}/comments", {"body": body}
+        )
+
+    async def delete_branch(self, repo: str, branch: str) -> None:
+        await self._request("DELETE", f"/repos/{repo}/git/refs/heads/{branch}")
+
+    # -------- Read path for reviewers: PR diff + changed files --------
+    @github_breaker
+    async def _request_text(self, path: str, accept: str) -> str:
+        if settings.github_token_is_placeholder:
+            raise RuntimeError(
+                "GITHUB_TOKEN is a placeholder — set a real PAT to fetch PR diffs."
+            )
+        headers = {**self._headers, "Accept": accept}
+        url = f"{settings.github_api_url}{path}"
+        async with httpx.AsyncClient(timeout=15.0, headers=headers) as c:
+            resp = await c.get(url)
+            resp.raise_for_status()
+            return resp.text
+
+    async def get_pull_request_diff(self, repo: str, number: int) -> str:
+        return await self._request_text(
+            f"/repos/{repo}/pulls/{number}", "application/vnd.github.diff"
+        )
+
+    async def list_pull_request_files(self, repo: str, number: int) -> list[dict]:
+        return await self._request(  # type: ignore
+            "GET", f"/repos/{repo}/pulls/{number}/files?per_page=100"
+        )
+
 
 client = GitHubClient()

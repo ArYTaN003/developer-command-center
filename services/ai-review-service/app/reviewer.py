@@ -60,22 +60,31 @@ def _call_claude(prompt: str) -> str:
     return "".join(b.text for b in msg.content if b.type == "text")
 
 
-def build_prompt(repo: str, pr: dict, context: str, template: dict) -> str:
+def build_prompt(repo: str, pr: dict, context: str, template: dict, diff: dict | None = None) -> str:
     focus = template.get("focus_areas", "correctness, readability")
     ctx = f"Project context:\n{context}\n\n" if context else "(No project context available — degraded mode.)\n\n"
+    if diff and diff.get("diff"):
+        names = ", ".join(f.get("filename", "") for f in diff.get("files", [])[:20]) or "(unknown)"
+        trunc = " (diff truncated to fit)" if diff.get("truncated") else ""
+        code = (f"Changed files ({diff.get('file_count', 0)}): {names}\n\n"
+                f"Unified diff{trunc}:\n{diff['diff']}\n\n")
+    else:
+        code = "(No diff available — review from metadata/context only.)\n\n"
     return (
         f"You are a senior reviewer. Focus on: {focus}.\n\n"
         f"{ctx}"
+        f"{code}"
         f"Review the following pull request and give a concise 4-6 bullet summary "
-        f"of risks and suggestions.\n\n"
+        f"of risks and suggestions, citing specific files/lines from the diff where possible.\n\n"
         f"PR: {repo} #{pr.get('number')} — {pr.get('title','')}\n"
         f"{pr.get('body','')}"
     )
 
 
-def generate_review(repo: str, pr: dict, context: str, template: dict) -> tuple[str, bool]:
+def generate_review(repo: str, pr: dict, context: str, template: dict,
+                    diff: dict | None = None) -> tuple[str, bool]:
     """Return (review_text, degraded?). Never raises — always returns something."""
-    prompt = build_prompt(repo, pr, context, template)
+    prompt = build_prompt(repo, pr, context, template, diff)
     try:
         return _call_claude(prompt), False
     except pybreaker.CircuitBreakerError:
