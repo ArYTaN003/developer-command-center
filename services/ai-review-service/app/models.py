@@ -19,7 +19,7 @@ def _now() -> datetime:
 class Review(Base):
     __tablename__ = "reviews"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    pr_id: Mapped[str] = mapped_column(String(255), index=True)
+    pr_id: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     repo: Mapped[str] = mapped_column(String(255), index=True)
     pr_number: Mapped[int] = mapped_column(Integer, default=0)
     summary: Mapped[str] = mapped_column(Text, default="")

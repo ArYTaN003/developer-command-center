@@ -12,7 +12,7 @@ log = logging.getLogger("ai-review-service.consumer")
 
 
 async def _on_message(message: aio_pika.abc.AbstractIncomingMessage) -> None:
-    async with message.process(requeue=True):
+    async with message.process(requeue=False):
         event = json.loads(message.body.decode())
         repo = event.get("repo", "unknown")
         result = await run_review(repo, event)
@@ -26,8 +26,17 @@ async def run_consumer() -> None:
     exchange = await channel.declare_exchange(
         settings.rabbitmq_events_exchange, aio_pika.ExchangeType.TOPIC, durable=True
     )
-    queue = await channel.declare_queue("ai-review.pr-opened", durable=True)
+    # Dead-letter exchange + queue: a failing review message is routed here
+    # instead of being requeued forever (poison-message protection).
+    dlx = await channel.declare_exchange("dlx", aio_pika.ExchangeType.DIRECT, durable=True)
+    dead_queue = await channel.declare_queue("ai-review.pr-opened.dead", durable=True)
+    await dead_queue.bind(dlx, routing_key="ai-review.pr-opened.dead")
+    queue = await channel.declare_queue(
+        "ai-review.pr-opened", durable=True,
+        arguments={"x-dead-letter-exchange": "dlx",
+                   "x-dead-letter-routing-key": "ai-review.pr-opened.dead"},
+    )
     await queue.bind(exchange, routing_key="pr.opened")
-    log.info("ai-review consumer bound to pr.opened")
+    log.info("ai-review consumer bound to pr.opened (DLQ: ai-review.pr-opened.dead)")
     await queue.consume(_on_message)
     await asyncio.Future()

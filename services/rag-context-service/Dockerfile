@@ -10,12 +10,16 @@ RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 FROM python:3.12-slim-bookworm AS runtime
 RUN apt-get update && apt-get install -y --no-install-recommends curl \
       && rm -rf /var/lib/apt/lists/*
-RUN groupadd -r appgroup && useradd -r -g appgroup appuser
+RUN groupadd -r appgroup && useradd -r -m -d /home/appuser -g appgroup appuser
 WORKDIR /app
 COPY --from=builder /install /usr/local
 COPY --chown=appuser:appgroup ./app ./app
 COPY --chown=appuser:appgroup ./context.proto ./context.proto
 USER appuser
+# Pre-bake the embedding model (EMBEDDING_MODE=st) so readiness isn't blocked by
+# a cold model download; cache lives in appuser's home.
+ENV HF_HOME=/home/appuser/.cache/huggingface
+RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('all-MiniLM-L6-v2')"
 EXPOSE 8000 50051
 HEALTHCHECK --interval=15s --timeout=5s --start-period=25s --retries=5 \
   CMD curl -fsS http://localhost:8000/health || exit 1
