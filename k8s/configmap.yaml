@@ -26,7 +26,7 @@ data:
   REDIS_HOST: "redis"
   REDIS_PORT: "6379"
   # Embeddings
-  EMBEDDING_MODE: "hash"
+  EMBEDDING_MODE: "st"
   EMBEDDING_DIM: "256"
   # GitHub
   GITHUB_API_URL: "https://api.github.com"
