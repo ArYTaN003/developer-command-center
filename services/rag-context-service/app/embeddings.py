@@ -6,10 +6,13 @@ locally without downloading a multi-GB model. Set EMBEDDING_MODE=st to use
 sentence-transformers (requires adding it to requirements.txt).
 """
 import hashlib
+import logging
 import math
 import re
 
 from .config import settings
+
+log = logging.getLogger("rag-context-service.embeddings")
 
 _WORD = re.compile(r"[A-Za-z0-9_]+")
 _st_model = None
@@ -32,6 +35,7 @@ def _st_embed(text: str) -> list[float]:
     if _st_model is None:
         from sentence_transformers import SentenceTransformer  # lazy import
         _st_model = SentenceTransformer("all-MiniLM-L6-v2")
+        log.info("Loaded sentence-transformers all-MiniLM-L6-v2 (384-dim, semantic)")
     return _st_model.encode(text, normalize_embeddings=True).tolist()
 
 

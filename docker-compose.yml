@@ -129,7 +129,7 @@ services:
       QDRANT_COLLECTION: ${QDRANT_COLLECTION:-github_context}
       REDIS_HOST: redis
       REDIS_PORT: "6379"
-      EMBEDDING_MODE: ${EMBEDDING_MODE:-hash}
+      EMBEDDING_MODE: ${EMBEDDING_MODE:-st}
       EMBEDDING_DIM: ${EMBEDDING_DIM:-256}
     depends_on:
       qdrant: {condition: service_healthy}

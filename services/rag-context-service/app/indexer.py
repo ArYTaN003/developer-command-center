@@ -15,6 +15,7 @@ from .embeddings import embed, vector_size
 log = logging.getLogger("rag-context-service.indexer")
 
 _client = QdrantClient(host=settings.qdrant_host, port=settings.qdrant_port)
+_collection_ready = False
 
 
 def _point_id(doc_id: str) -> int:
@@ -23,6 +24,9 @@ def _point_id(doc_id: str) -> int:
 
 
 def ensure_collection() -> None:
+    global _collection_ready
+    if _collection_ready:
+        return
     existing = {c.name for c in _client.get_collections().collections}
     if settings.qdrant_collection not in existing:
         _client.create_collection(
@@ -32,6 +36,7 @@ def ensure_collection() -> None:
             ),
         )
         log.info("Created Qdrant collection %s", settings.qdrant_collection)
+    _collection_ready = True
 
 
 def index_document(doc_id: str, text: str, metadata: dict) -> None:

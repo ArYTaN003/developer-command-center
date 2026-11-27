@@ -14,6 +14,7 @@ RUN groupadd -r appgroup && useradd -r -g appgroup appuser
 WORKDIR /app
 COPY --from=builder /install /usr/local
 COPY --chown=appuser:appgroup ./app ./app
+COPY --chown=appuser:appgroup ./context.proto ./context.proto
 USER appuser
 EXPOSE 8000
 HEALTHCHECK --interval=15s --timeout=5s --start-period=20s --retries=5 \

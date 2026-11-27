@@ -9,3 +9,6 @@ anthropic==0.39.0
 httpx==0.27.2
 tenacity==9.0.0
 pybreaker==1.2.0
+grpcio==1.68.1
+grpcio-tools==1.68.1
+sentence-transformers==3.3.1
