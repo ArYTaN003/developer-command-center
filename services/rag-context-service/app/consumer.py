@@ -10,11 +10,14 @@ import logging
 import aio_pika
 
 from .config import settings
-from .indexer import index_document
+from .indexer import delete_by_pr, delete_by_repo, index_document
 
 log = logging.getLogger("rag-context-service.consumer")
 
 _ROUTING_KEYS = ["pr.opened", "pr.closed", "commit.pushed", "issue.created"]
+# Untrack events (published by github-service on CRUD delete): purge the
+# matching vectors so the RAG store doesn't serve stale context.
+_UNTRACK_KEYS = ["repo.untracked", "pr.untracked"]
 
 
 def _to_document(event: dict) -> tuple[str, str, dict]:
@@ -36,8 +39,20 @@ def _to_document(event: dict) -> tuple[str, str, dict]:
 async def _on_message(message: aio_pika.abc.AbstractIncomingMessage) -> None:
     async with message.process(requeue=False):
         event = json.loads(message.body.decode())
-        doc_id, text, meta = _to_document(event)
-        index_document(doc_id, text, meta)
+        etype = event.get("type", "")
+        if etype == "repo.untracked":
+            removed = delete_by_repo(event["repo"])
+            log.info("repo.untracked %s -> purged %d points", event["repo"], removed)
+        elif etype == "pr.untracked":
+            number = event.get("number")
+            if number is not None:
+                removed = delete_by_pr(event["repo"], number)
+            else:
+                removed = delete_by_repo(event["repo"])
+            log.info("pr.untracked %s#%s -> purged %d points", event["repo"], number, removed)
+        else:
+            doc_id, text, meta = _to_document(event)
+            index_document(doc_id, text, meta)
 
 
 async def run_consumer() -> None:
@@ -57,8 +72,9 @@ async def run_consumer() -> None:
         arguments={"x-dead-letter-exchange": "dlx",
                    "x-dead-letter-routing-key": "rag-context.index.dead"},
     )
-    for key in _ROUTING_KEYS:
+    for key in _ROUTING_KEYS + _UNTRACK_KEYS:
         await queue.bind(exchange, routing_key=key)
-    log.info("rag consumer bound to %s (DLQ: rag-context.index.dead)", _ROUTING_KEYS)
+    log.info("rag consumer bound to %s (DLQ: rag-context.index.dead)",
+             _ROUTING_KEYS + _UNTRACK_KEYS)
     await queue.consume(_on_message)
     await asyncio.Future()  # run forever

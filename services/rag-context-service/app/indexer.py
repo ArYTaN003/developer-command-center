@@ -73,3 +73,34 @@ def count(repo: str | None = None) -> int:
             must=[models.FieldCondition(key="repo", match=models.MatchValue(value=repo))]
         )
     return _client.count(settings.qdrant_collection, count_filter=flt).count
+
+
+def delete_by_repo(repo: str) -> int:
+    """Purge all points for a repo (handles repo.untracked). Returns count removed."""
+    ensure_collection()
+    flt = models.Filter(
+        must=[models.FieldCondition(key="repo", match=models.MatchValue(value=repo))]
+    )
+    removed = _client.count(settings.qdrant_collection, count_filter=flt).count
+    _client.delete(
+        collection_name=settings.qdrant_collection,
+        points_selector=models.FilterSelector(filter=flt),
+    )
+    log.info("Purged %d points for repo=%s", removed, repo)
+    return removed
+
+
+def delete_by_pr(repo: str, number: int) -> int:
+    """Purge points for a single PR (handles pr.untracked). Returns count removed."""
+    ensure_collection()
+    flt = models.Filter(must=[
+        models.FieldCondition(key="repo", match=models.MatchValue(value=repo)),
+        models.FieldCondition(key="number", match=models.MatchValue(value=int(number))),
+    ])
+    removed = _client.count(settings.qdrant_collection, count_filter=flt).count
+    _client.delete(
+        collection_name=settings.qdrant_collection,
+        points_selector=models.FilterSelector(filter=flt),
+    )
+    log.info("Purged %d points for repo=%s pr#%s", removed, repo, number)
+    return removed
